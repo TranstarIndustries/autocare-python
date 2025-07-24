@@ -1,0 +1,21 @@
+[project]
+name = "autocare"
+version = "0.1.0"
+description = "Python client for the AutoCare API"
+license = { text = "MIT" }
+authors = [ { name = "Andy Craze", email = "acraze@nexamotiongroup.com" } ]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.32.4",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "pre-commit>=4.1.0",
+    "pytest>=8.3.4",
+    "requests-mock>=1.12.1",
+    "ruff>=0.9.5",
+    "types-requests>=2.32.4.20250611",
+]

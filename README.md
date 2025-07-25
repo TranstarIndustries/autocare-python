@@ -1,6 +1,6 @@
 # AutoCare Python Client
 
-![Python Tests](https://github.com/TranstarIndustries/autocare-python/workflows/main-validate.yaml/badge.svg)
+![Python Tests](https://github.com/TranstarIndustries/autocare-python/actions/workflows/main-validate.yaml/badge.svg)
 ![PyPI Version](https://img.shields.io/pypi/v/autocare.svg)
 ![PyPI Downloads](https://img.shields.io/pypi/dm/autocare.svg)
 

@@ -1,4 +1,4 @@
-name: Main Lint Test on Main
+name: Tests
 on:
   push:
     branches:

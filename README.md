@@ -1,5 +1,10 @@
 # AutoCare Python Client
 
+![Python Tests](https://github.com/TranstarIndustries/autocare-python/workflows/main-validate.yaml/badge.svg)
+![PyPI Version](https://img.shields.io/pypi/v/autocare.svg)
+![PyPI Downloads](https://img.shields.io/pypi/dm/autocare.svg)
+
+
 A Python client library for interacting with AutoCare Association databases and services.
 
 ## Features
@@ -13,8 +18,16 @@ A Python client library for interacting with AutoCare Association databases and 
 
 ## Installation
 
+### From PyPI (Recommended)
+
 ```bash
-git clone <repository-url>
+pip install autocare
+```
+
+### From Source
+
+```bash
+git clone https://github.com/TranstarIndustries/autocare-python.git
 cd autocare-python
 uv sync --all-extras
 ```

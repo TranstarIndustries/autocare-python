@@ -13,6 +13,9 @@ build/
 .venv/
 venv/
 
+# Documentation (large binaries - shared externally)
+docs/
+
 # IDE / Tools
 .claude/
 .idea/

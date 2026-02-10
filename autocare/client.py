@@ -107,6 +107,20 @@ class AutoCareAPI:
     DEFAULT_RETRIES = 3
     TOKEN_REFRESH_BUFFER = 300  # Refresh token 5 minutes before expiry
 
+    DEFAULT_API_VERSIONS: Dict[str, str] = {
+        "vcdb": "2.0",
+        "pcdb": "1.0",
+        "padb": "5.0",
+        "qdb": "2.0",
+        "brand": "2.0",
+    }
+
+    # Maps database name -> subdomain for databases that don't match their own name
+    DATABASE_SUBDOMAINS: Dict[str, str] = {
+        "padb": "pcdb",
+    }
+
+
     def __init__(
         self,
         client_id: str,
@@ -118,6 +132,7 @@ class AutoCareAPI:
         max_retries: int = DEFAULT_RETRIES,
         base_url: Optional[str] = None,
         auth_url: Optional[str] = None,
+        api_versions: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize the AutoCare API client.
@@ -132,6 +147,7 @@ class AutoCareAPI:
             max_retries: Maximum retry attempts
             base_url: Override default base URL
             auth_url: Override default auth URL
+            api_versions: Per-database API version overrides
         """
         self.client_id = client_id
         self.client_secret = client_secret
@@ -142,6 +158,11 @@ class AutoCareAPI:
 
         self.base_url = base_url or self.BASE_URL
         self.auth_url = auth_url or self.AUTH_URL
+
+        # Merge custom api_versions over defaults
+        self.api_versions = dict(self.DEFAULT_API_VERSIONS)
+        if api_versions:
+            self.api_versions.update(api_versions)
 
         # Token management
         self.token = None
@@ -167,6 +188,37 @@ class AutoCareAPI:
 
         # Authenticate on initialization
         self.authenticate()
+
+    def _build_record_url(self, db_name: str, table_name: str, version: str) -> str:
+        """
+        Build the correct record-fetching URL for a given database and table.
+
+        Args:
+            db_name: Database name
+            table_name: Table name
+            version: API version string
+
+        Returns:
+            Fully qualified URL
+        """
+        db_lower = db_name.lower()
+        subdomain = self.DATABASE_SUBDOMAINS.get(db_lower, db_lower)
+        url = f"https://{subdomain}.autocarevip.com/api/v{version}/{db_lower}/{table_name}"
+
+        logger.debug(f"Built record URL: {url}")
+        return url
+
+    def get_version(self, db_name: str) -> str:
+        """
+        Get the API version for a database.
+
+        Args:
+            db_name: Database name (case-insensitive)
+
+        Returns:
+            Version string (e.g. "2.0"). Falls back to "1.0" for unknown databases.
+        """
+        return self.api_versions.get(db_name.lower(), "1.0")
 
     def authenticate(self) -> str:
         """
@@ -452,7 +504,7 @@ class AutoCareAPI:
         self,
         db_name: str,
         table_name: str,
-        version: str = "1.0",
+        version: Optional[str] = None,
         limit: Optional[int] = None,
         page_size: Optional[int] = None,
     ) -> Iterator[Dict[str, Any]]:
@@ -462,7 +514,7 @@ class AutoCareAPI:
         Args:
             db_name: Database name
             table_name: Table name
-            version: API version
+            version: API version override. When None, uses api_versions default.
             limit: Maximum number of records to fetch (None for all)
             page_size: Records per page for pagination
 
@@ -477,9 +529,8 @@ class AutoCareAPI:
         if not db_name or not table_name:
             raise DataValidationError("Database name and table name are required")
 
-        base_url = (
-            f"https://{db_name}.autocarevip.com/api/v{version}/{db_name}/{table_name}"
-        )
+        resolved_version = version if version is not None else self.get_version(db_name)
+        base_url = self._build_record_url(db_name, table_name, resolved_version)
         next_page: Optional[str] = base_url
         records_fetched = 0
 
@@ -541,7 +592,10 @@ class AutoCareAPI:
         logger.info(f"Fetched {records_fetched} records from {db_name}.{table_name}")
 
     def fetch_all_records(
-        self, db_name: str, table_name: str, version: str = "1.0"
+        self,
+        db_name: str,
+        table_name: str,
+        version: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch all records from a table and return as a list.
@@ -549,7 +603,7 @@ class AutoCareAPI:
         Args:
             db_name: Database name
             table_name: Table name
-            version: API version
+            version: API version override. When None, uses api_versions default.
 
         Returns:
             List of all records

@@ -340,7 +340,7 @@ class TestRecordFetching:
         ]
 
         requests_mock.get(
-            "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle", json=mock_records
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle", json=mock_records
         )
 
         records = list(self.client.fetch_records("vcdb", "Vehicle"))
@@ -360,19 +360,19 @@ class TestRecordFetching:
         # First page
         page1_records = [{"VehicleID": 1}, {"VehicleID": 2}]
         page1_headers = {
-            "X-Pagination": '{"nextPageLink": "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle?page=2"}'
+            "X-Pagination": '{"nextPageLink": "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle?page=2"}'
         }
 
         # Second page
         page2_records = [{"VehicleID": 3}, {"VehicleID": 4}]
 
         requests_mock.get(
-            "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle",
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
             json=page1_records,
             headers=page1_headers,
         )
         requests_mock.get(
-            "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle?page=2",
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle?page=2",
             json=page2_records,
         )
 
@@ -393,7 +393,7 @@ class TestRecordFetching:
         mock_records = [{"VehicleID": i} for i in range(1, 6)]  # 5 records
 
         requests_mock.get(
-            "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle", json=mock_records
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle", json=mock_records
         )
 
         records = list(self.client.fetch_records("vcdb", "Vehicle", limit=3))
@@ -424,7 +424,7 @@ class TestRecordFetching:
         mock_records = [{"VehicleID": 1}, {"VehicleID": 2}]
 
         requests_mock.get(
-            "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle", json=mock_records
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle", json=mock_records
         )
 
         records = self.client.fetch_all_records("vcdb", "Vehicle")
@@ -568,6 +568,206 @@ class TestUtilityMethods:
         assert self.client.base_url in repr_str
 
 
+class TestURLRouting:
+    """Test database-specific URL routing."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        with patch.object(AutoCareAPI, "authenticate", return_value="test-token"):
+            self.client = AutoCareAPI("id", "secret", "user", "pass")
+
+    def teardown_method(self):
+        """Clean up after tests."""
+        self.client.close()
+
+    def test_vcdb_url(self, requests_mock):
+        """Test VCdb uses vcdb subdomain."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
+            json=[{"VehicleID": 1}],
+        )
+        records = list(self.client.fetch_records("vcdb", "Vehicle"))
+        assert len(records) == 1
+
+    def test_pcdb_url(self, requests_mock):
+        """Test PCdb uses pcdb subdomain."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://pcdb.autocarevip.com/api/v1.0/pcdb/Parts",
+            json=[{"PartTerminologyID": 1}],
+        )
+        records = list(self.client.fetch_records("pcdb", "Parts"))
+        assert len(records) == 1
+
+    def test_padb_uses_pcdb_subdomain(self, requests_mock):
+        """Test PAdb routes through pcdb subdomain, not padb."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://pcdb.autocarevip.com/api/v5.0/padb/PartAttributes",
+            json=[{"PartAttributeID": 1}],
+        )
+        records = list(self.client.fetch_records("padb", "PartAttributes"))
+        assert len(records) == 1
+
+    def test_qdb_url(self, requests_mock):
+        """Test QDb uses qdb subdomain."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://qdb.autocarevip.com/api/v2.0/qdb/Qualifier",
+            json=[{"QualifierID": 1}],
+        )
+        records = list(self.client.fetch_records("qdb", "Qualifier"))
+        assert len(records) == 1
+
+    def test_brand_url(self, requests_mock):
+        """Test Brand Table uses brand subdomain with standard table path."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://brand.autocarevip.com/api/v2.0/brand/BrandTable",
+            json=[{"BrandID": "BBBB", "BrandName": "3M"}],
+        )
+        records = list(self.client.fetch_records("brand", "BrandTable"))
+        assert len(records) == 1
+
+    def test_case_insensitive_routing(self, requests_mock):
+        """Test that routing works case-insensitively."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://pcdb.autocarevip.com/api/v5.0/padb/PartAttributes",
+            json=[{"PartAttributeID": 1}],
+        )
+        records = list(self.client.fetch_records("PADB", "PartAttributes"))
+        assert len(records) == 1
+
+
+class TestMultiVersionSupport:
+    """Test multi-version API support."""
+
+    def test_default_api_versions(self):
+        """Test that default api_versions are set correctly."""
+        with patch.object(AutoCareAPI, "authenticate", return_value="test-token"):
+            client = AutoCareAPI("id", "secret", "user", "pass")
+
+            assert client.api_versions == {
+                "vcdb": "2.0",
+                "pcdb": "1.0",
+                "padb": "5.0",
+                "qdb": "2.0",
+                "brand": "2.0",
+            }
+
+            client.close()
+
+    def test_custom_api_versions(self):
+        """Test that custom api_versions override defaults."""
+        with patch.object(AutoCareAPI, "authenticate", return_value="test-token"):
+            custom = {"vcdb": "1.0", "pcdb": "1.0"}
+            client = AutoCareAPI("id", "secret", "user", "pass", api_versions=custom)
+
+            # Custom values override defaults
+            assert client.api_versions["vcdb"] == "1.0"
+            # Non-overridden values keep defaults
+            assert client.api_versions["padb"] == "5.0"
+            assert client.api_versions["qdb"] == "2.0"
+            assert client.api_versions["brand"] == "2.0"
+
+            client.close()
+
+    def test_get_version(self):
+        """Test get_version helper method."""
+        with patch.object(AutoCareAPI, "authenticate", return_value="test-token"):
+            client = AutoCareAPI("id", "secret", "user", "pass")
+
+            assert client.get_version("vcdb") == "2.0"
+            assert client.get_version("pcdb") == "1.0"
+            assert client.get_version("padb") == "5.0"
+            assert client.get_version("qdb") == "2.0"
+            assert client.get_version("brand") == "2.0"
+            # Unknown database falls back to "1.0"
+            assert client.get_version("unknown") == "1.0"
+
+            client.close()
+
+    def test_fetch_records_uses_api_versions(self, requests_mock):
+        """Test that fetch_records uses api_versions when version is None."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+
+        client = AutoCareAPI("id", "secret", "user", "pass")
+
+        mock_records = [{"VehicleID": 1}]
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
+            json=mock_records,
+        )
+
+        records = list(client.fetch_records("vcdb", "Vehicle"))
+        assert len(records) == 1
+
+        client.close()
+
+    def test_fetch_records_explicit_version_overrides(self, requests_mock):
+        """Test that explicit version param overrides api_versions."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+
+        client = AutoCareAPI("id", "secret", "user", "pass")
+
+        mock_records = [{"VehicleID": 1}]
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v1.0/vcdb/Vehicle",
+            json=mock_records,
+        )
+
+        records = list(client.fetch_records("vcdb", "Vehicle", version="1.0"))
+        assert len(records) == 1
+
+        client.close()
+
+    def test_fetch_all_records_uses_api_versions(self, requests_mock):
+        """Test that fetch_all_records uses api_versions when version is None."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+
+        client = AutoCareAPI("id", "secret", "user", "pass")
+
+        mock_records = [{"VehicleID": 1}]
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
+            json=mock_records,
+        )
+
+        records = client.fetch_all_records("vcdb", "Vehicle")
+        assert len(records) == 1
+
+        client.close()
+
+
 class TestConvenienceFunctions:
     """Test convenience functions."""
 
@@ -579,6 +779,18 @@ class TestConvenienceFunctions:
         assert isinstance(client, AutoCareAPI)
         assert client.client_id == "id"
         assert client.timeout == 60
+
+        client.close()
+
+    @patch.object(AutoCareAPI, "authenticate", return_value="test-token")
+    def test_create_client_forwards_api_versions(self, mock_auth):
+        """Test that create_client forwards api_versions."""
+        client = create_client(
+            "id", "secret", "user", "pass", api_versions={"vcdb": "1.0"}
+        )
+
+        assert client.api_versions["vcdb"] == "1.0"
+        assert client.api_versions["padb"] == "5.0"
 
         client.close()
 

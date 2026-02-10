@@ -12,6 +12,12 @@ import os
 import pytest
 
 from autocare.client import AutoCareAPI
+from autocare.databases.vcdb import Vehicle, Make
+from autocare.databases.pcdb import Part
+from autocare.databases.padb import PartAttribute
+from autocare.databases.qdb import Qualifier
+from autocare.databases.brand import Brand
+from autocare.compatibility.field_mapping import migrate_vcdb_record
 
 
 def _load_env():
@@ -115,3 +121,112 @@ class TestIntegrationSmoke:
         """Test fetching a Brand record."""
         records = list(api_client.fetch_records("brand", "BrandTable", limit=1))
         assert len(records) == 1
+
+
+@pytest.mark.integration
+@skip_no_creds
+class TestIntegrationTypedModels:
+    """Test typed model fetching against real API."""
+
+    def test_fetch_vcdb_vehicle_typed(self, api_client):
+        """Test fetching VCdb Vehicle as typed model."""
+        records = list(
+            api_client.fetch_records("vcdb", "Vehicle", limit=2, model=Vehicle)
+        )
+        assert len(records) == 2
+        assert isinstance(records[0], Vehicle)
+        assert records[0].VehicleID is not None
+        assert records[0].BaseVehicleID is not None
+        assert records[0].EffectiveDateTime is not None
+
+    def test_fetch_vcdb_make_typed(self, api_client):
+        """Test fetching VCdb Make as typed model with CultureID."""
+        records = list(
+            api_client.fetch_records("vcdb", "Make", limit=1, model=Make)
+        )
+        assert len(records) == 1
+        assert isinstance(records[0], Make)
+        assert records[0].MakeName is not None
+        assert records[0].CultureID is not None
+
+    def test_fetch_pcdb_part_typed(self, api_client):
+        """Test fetching PCdb Part as typed model."""
+        records = list(
+            api_client.fetch_records("pcdb", "Parts", limit=1, model=Part)
+        )
+        assert len(records) == 1
+        assert isinstance(records[0], Part)
+        assert records[0].PartTerminologyID is not None
+        assert records[0].PartTerminologyName is not None
+
+    def test_fetch_padb_attribute_typed(self, api_client):
+        """Test fetching PAdb PartAttribute as typed model."""
+        records = list(
+            api_client.fetch_records(
+                "padb", "PartAttributes", limit=1, model=PartAttribute
+            )
+        )
+        assert len(records) == 1
+        assert isinstance(records[0], PartAttribute)
+        assert records[0].PAID is not None
+
+    def test_fetch_qdb_qualifier_typed(self, api_client):
+        """Test fetching Qdb Qualifier as typed model."""
+        records = list(
+            api_client.fetch_records("qdb", "Qualifier", limit=1, model=Qualifier)
+        )
+        assert len(records) == 1
+        assert isinstance(records[0], Qualifier)
+        assert records[0].QualifierID is not None
+
+    def test_fetch_brand_typed(self, api_client):
+        """Test fetching Brand as typed model."""
+        records = list(
+            api_client.fetch_records("brand", "BrandTable", limit=1, model=Brand)
+        )
+        assert len(records) == 1
+        assert isinstance(records[0], Brand)
+        assert records[0].BrandID is not None
+
+    def test_fetch_all_records_typed(self, api_client):
+        """Test fetch_all_records with model param."""
+        records = api_client.fetch_all_records(
+            "qdb", "Qualifier", model=Qualifier
+        )
+        assert len(records) > 0
+        assert all(isinstance(r, Qualifier) for r in records)
+
+
+@pytest.mark.integration
+@skip_no_creds
+class TestIntegrationFieldMapping:
+    """Test field mapping against real API records."""
+
+    def test_migrate_vcdb_v20_to_v10(self, api_client):
+        """Test stripping versioning fields from real VCdb v2.0 records."""
+        records = list(api_client.fetch_records("vcdb", "Vehicle", limit=2))
+        assert len(records) > 0
+
+        for record in records:
+            # Confirm v2.0 record has versioning fields
+            assert "EffectiveDateTime" in record
+
+            migrated = migrate_vcdb_record(record, "2.0", "1.0")
+            assert "EffectiveDateTime" not in migrated
+            assert "EndDateTime" not in migrated
+            assert "CultureID" not in migrated
+            assert migrated["VehicleID"] == record["VehicleID"]
+
+    def test_migrate_vcdb_roundtrip(self, api_client):
+        """Test that migrating v2.0 -> v1.0 -> v2.0 preserves core fields."""
+        records = list(api_client.fetch_records("vcdb", "Vehicle", limit=1))
+        original = records[0]
+
+        v1 = migrate_vcdb_record(original, "2.0", "1.0")
+        v2 = migrate_vcdb_record(v1, "1.0", "2.0")
+
+        # Core data fields should survive the roundtrip
+        assert v2["VehicleID"] == original["VehicleID"]
+        assert v2["BaseVehicleID"] == original["BaseVehicleID"]
+        # Versioning fields are lost in the downgrade (expected)
+        assert v2["EffectiveDateTime"] is None

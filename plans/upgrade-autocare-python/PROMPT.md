@@ -1,0 +1,1 @@
+Use the subsection titled "autocare-python Update Plan" in the `AUTOCARE_DEEP_DIVE_ANALYSIS.md` to construct a detailed plan for how to upgrade the autocare-python package, defined here in this project.

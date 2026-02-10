@@ -9,7 +9,7 @@ with proper error handling, logging, and type safety.
 import json
 import logging
 import time
-from typing import Dict, List, Optional, Any, Iterator
+from typing import Dict, List, Optional, Any, Iterator, Type, Union
 from dataclasses import dataclass
 import requests
 from requests.adapters import HTTPAdapter
@@ -507,7 +507,8 @@ class AutoCareAPI:
         version: Optional[str] = None,
         limit: Optional[int] = None,
         page_size: Optional[int] = None,
-    ) -> Iterator[Dict[str, Any]]:
+        model: Optional[Type] = None,
+    ) -> Iterator[Any]:
         """
         Fetch records from a database table with pagination support.
 
@@ -517,9 +518,12 @@ class AutoCareAPI:
             version: API version override. When None, uses api_versions default.
             limit: Maximum number of records to fetch (None for all)
             page_size: Records per page for pagination
+            model: Optional typed model class with from_dict() classmethod.
+                   When provided, each record dict is converted to a model instance.
+                   When None, raw dicts are yielded.
 
         Yields:
-            Individual records as dictionaries
+            Individual records as dictionaries or typed model instances
 
         Raises:
             APIConnectionError: If request fails
@@ -564,7 +568,7 @@ class AutoCareAPI:
                         logger.info(f"Reached record limit: {limit}")
                         return
 
-                    yield record
+                    yield model.from_dict(record) if model else record
                     records_fetched += 1
 
                 # Handle pagination
@@ -596,7 +600,8 @@ class AutoCareAPI:
         db_name: str,
         table_name: str,
         version: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model: Optional[Type] = None,
+    ) -> List[Any]:
         """
         Fetch all records from a table and return as a list.
 
@@ -604,11 +609,12 @@ class AutoCareAPI:
             db_name: Database name
             table_name: Table name
             version: API version override. When None, uses api_versions default.
+            model: Optional typed model class with from_dict() classmethod.
 
         Returns:
-            List of all records
+            List of all records (dicts or model instances)
         """
-        return list(self.fetch_records(db_name, table_name, version))
+        return list(self.fetch_records(db_name, table_name, version, model=model))
 
     def get_table_info(self, db_name: str, table_name: str) -> Optional[TableInfo]:
         """

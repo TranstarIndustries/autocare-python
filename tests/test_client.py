@@ -568,6 +568,91 @@ class TestUtilityMethods:
         assert self.client.base_url in repr_str
 
 
+class TestTypedRecordFetching:
+    """Test typed model support in fetch_records."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        with patch.object(AutoCareAPI, "authenticate", return_value="test-token"):
+            self.client = AutoCareAPI("id", "secret", "user", "pass")
+
+    def teardown_method(self):
+        """Clean up after tests."""
+        self.client.close()
+
+    def test_fetch_records_with_model(self, requests_mock):
+        """Test fetch_records returns typed models when model kwarg is provided."""
+        from autocare.databases.vcdb import Vehicle
+
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
+            json=[
+                {"VehicleID": 1, "BaseVehicleID": 1, "EffectiveDateTime": "2024-01-01"},
+                {"VehicleID": 2, "BaseVehicleID": 2, "EffectiveDateTime": "2024-01-02"},
+            ],
+        )
+
+        records = list(self.client.fetch_records("vcdb", "Vehicle", model=Vehicle))
+        assert len(records) == 2
+        assert isinstance(records[0], Vehicle)
+        assert records[0].VehicleID == 1
+        assert records[1].VehicleID == 2
+
+    def test_fetch_records_without_model_returns_dicts(self, requests_mock):
+        """Test fetch_records returns dicts when model is None (default)."""
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
+            json=[{"VehicleID": 1}],
+        )
+
+        records = list(self.client.fetch_records("vcdb", "Vehicle"))
+        assert len(records) == 1
+        assert isinstance(records[0], dict)
+
+    def test_fetch_all_records_with_model(self, requests_mock):
+        """Test fetch_all_records returns typed models."""
+        from autocare.databases.brand import Brand
+
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://brand.autocarevip.com/api/v2.0/brand/BrandTable",
+            json=[{"BrandID": "BBBB", "BrandName": "3M"}],
+        )
+
+        records = self.client.fetch_all_records("brand", "BrandTable", model=Brand)
+        assert len(records) == 1
+        assert isinstance(records[0], Brand)
+        assert records[0].BrandID == "BBBB"
+
+    def test_fetch_records_model_captures_extra_fields(self, requests_mock):
+        """Test that model.from_dict captures unknown fields in extra."""
+        from autocare.databases.vcdb import Vehicle
+
+        requests_mock.post(
+            AutoCareAPI.AUTH_URL,
+            json={"access_token": "test-token", "expires_in": 3600},
+        )
+        requests_mock.get(
+            "https://vcdb.autocarevip.com/api/v2.0/vcdb/Vehicle",
+            json=[{"VehicleID": 1, "NewAPIField": "surprise"}],
+        )
+
+        records = list(self.client.fetch_records("vcdb", "Vehicle", model=Vehicle))
+        assert records[0].VehicleID == 1
+        assert records[0].extra == {"NewAPIField": "surprise"}
+
+
 class TestURLRouting:
     """Test database-specific URL routing."""
 

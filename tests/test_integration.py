@@ -141,9 +141,7 @@ class TestIntegrationTypedModels:
 
     def test_fetch_vcdb_make_typed(self, api_client):
         """Test fetching VCdb Make as typed model with CultureID."""
-        records = list(
-            api_client.fetch_records("vcdb", "Make", limit=1, model=Make)
-        )
+        records = list(api_client.fetch_records("vcdb", "Make", limit=1, model=Make))
         assert len(records) == 1
         assert isinstance(records[0], Make)
         assert records[0].MakeName is not None
@@ -151,9 +149,7 @@ class TestIntegrationTypedModels:
 
     def test_fetch_pcdb_part_typed(self, api_client):
         """Test fetching PCdb Part as typed model."""
-        records = list(
-            api_client.fetch_records("pcdb", "Parts", limit=1, model=Part)
-        )
+        records = list(api_client.fetch_records("pcdb", "Parts", limit=1, model=Part))
         assert len(records) == 1
         assert isinstance(records[0], Part)
         assert records[0].PartTerminologyID is not None
@@ -190,9 +186,7 @@ class TestIntegrationTypedModels:
 
     def test_fetch_all_records_typed(self, api_client):
         """Test fetch_all_records with model param."""
-        records = api_client.fetch_all_records(
-            "qdb", "Qualifier", model=Qualifier
-        )
+        records = api_client.fetch_all_records("qdb", "Qualifier", model=Qualifier)
         assert len(records) > 0
         assert all(isinstance(r, Qualifier) for r in records)
 

@@ -1,6 +1,6 @@
 [project]
 name = "autocare"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python client for the AutoCare API"
 license = { text = "MIT" }
 authors = [ { name = "Andy Craze", email = "acraze@nexamotiongroup.com" } ]

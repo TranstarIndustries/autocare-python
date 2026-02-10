@@ -9,7 +9,7 @@ with proper error handling, logging, and type safety.
 import json
 import logging
 import time
-from typing import Dict, List, Optional, Any, Iterator, Type, Union
+from typing import Dict, List, Optional, Any, Iterator, Type
 from dataclasses import dataclass
 import requests
 from requests.adapters import HTTPAdapter
@@ -119,7 +119,6 @@ class AutoCareAPI:
     DATABASE_SUBDOMAINS: Dict[str, str] = {
         "padb": "pcdb",
     }
-
 
     def __init__(
         self,

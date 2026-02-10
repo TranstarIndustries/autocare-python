@@ -16,9 +16,7 @@ _VCDB_VERSIONS = {"1.0", "2.0"}
 _PADB_VERSIONS = {"4.0", "5.0"}
 
 
-def _rename_fields(
-    record: Dict[str, Any], renames: Dict[str, str]
-) -> Dict[str, Any]:
+def _rename_fields(record: Dict[str, Any], renames: Dict[str, str]) -> Dict[str, Any]:
     """Apply field renames to a record dict.
 
     Returns a new dict with renamed keys. Fields not in the rename map

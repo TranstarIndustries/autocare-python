@@ -2,13 +2,16 @@
 name = "autocare"
 version = "0.2.0"
 description = "Python client for the AutoCare API"
-license = { text = "MIT" }
+license = "MIT"
 authors = [ { name = "Andy Craze", email = "acraze@nexamotiongroup.com" } ]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "requests>=2.32.4",
 ]
+
+[tool.setuptools.packages.find]
+include = ["autocare*"]
 
 [dependency-groups]
 dev = [
